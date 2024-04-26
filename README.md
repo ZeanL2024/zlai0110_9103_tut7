@@ -2,4 +2,3 @@
 hi i am trying to communicate.
 
 ![An image of the Mona Lisa](https://placekitten.com/200/300)
-Links to an external site.
