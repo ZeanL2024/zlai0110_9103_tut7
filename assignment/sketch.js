@@ -1,126 +1,168 @@
-// Variables to hold image and image segments
+//We need a variable to hold our image
 let img;
-let numSegments = 10;
+
+//We will divide the image into segments
+let numSegments = 50;
+
+//We will store the segments in an array
 let segments = [];
 
-// Variables for drawing segments and the circle effect
+//let's add a variable to switch between drawing the image and the segments
 let drawSegments = true;
-let circle = {
-  x: 0,
-  y: 0,
-  radius: 20, // 初始半径
-  visible: false,
-  expanding: false, // 是否正在展开
-  maxRadius: 40 // 最大半径
-};
 
-// Load the image from disk
+//Let's make an object to hold the draw properties of the image
+let imgDrwPrps = {aspect: 0, width: 0, height: 0, xOffset: 0, yOffset: 0};
+
+//And a variable for the canvas aspect ratio
+let canvasAspectRatio = 0;
+
+//let's load the image from disk
 function preload() {
   img = loadImage('/assets/Mona_Lisa.jpg');
 }
 
-// Setup the canvas and divide the image into segments
 function setup() {
-  createCanvas(img.width, img.height);
+  //We will make the canvas the same size as the image using its properties
+  createCanvas(windowWidth, windowHeight);
+  //let's calculate the aspect ratio of the image - this will never change so we only need to do it once
+  imgDrwPrps.aspect = img.width / img.height;
+  
+  //now let's calculate the draw properties of the image using the function we made
+  calculateImageDrawProps();
+  //We can use the width and height of the image to calculate the size of each segment
+  //We use these values to calculate the coordinates of the centre of each segment so we can get the colour of the pixel from the image
   let segmentWidth = img.width / numSegments;
   let segmentHeight = img.height / numSegments;
-
-  // Create image segments
-  for (let segYPos = 0; segYPos < img.height; segYPos += segmentHeight) {
-    for (let segXPos = 0; segXPos < img.width; segXPos += segmentWidth) {
+  /*
+  Divide the original image into segments, we are going to use nested loops, this is the same as 
+  but we have changed the class defintion so we use the row and column position of the segment
+  */
+ //this will be the column position of every segment, we set it outside the loop 
+let positionInColumn = 0;
+  for (let segYPos=0; segYPos<img.height; segYPos+=segmentHeight) {
+    //this is looping over the height
+    let positionInRow = 0
+    for (let segXPos=0; segXPos<img.width; segXPos+=segmentWidth) {
+      //We will use the x and y position to get the colour of the pixel from the image
+      //let's take it from the centre of the segment
       let segmentColour = img.get(segXPos + segmentWidth / 2, segYPos + segmentHeight / 2);
-      let segment = new ImageSegment(segXPos, segYPos, segmentWidth, segmentHeight, segmentColour);
-      segments.push(segment);
+       let segment = new ImageSegment(positionInColumn, positionInRow,segmentColour);
+       segments.push(segment);
+       positionInRow++;
     }
+    positionInColumn++;
+  }
+  for (const segment of segments) {
+    segment.calculateSegDrawProps();
   }
 }
 
-// Draw function to handle all drawing on canvas
 function draw() {
   background(0);
   if (drawSegments) {
-    segments.forEach(segment => {
-      if (segment.contains(mouseX, mouseY)) {
-        stroke(255, 0, 0); // Red for hover
-      } else {
-        stroke(0); // Black otherwise
-      }
+    //let's draw the segments to the canvas
+    for (const segment of segments) {
       segment.draw();
-    });
+    }
   } else {
-    image(img, 0, 0);
+    //let's draw the image to the canvas
+    image(img, imgDrwPrps.xOffset, imgDrwPrps.yOffset, imgDrwPrps.width, imgDrwPrps.height);
   }
-
-  // Draw the circle animation
-  if (circle.visible) {
-    noFill();
-    stroke(128); // Grey stroke
-    ellipse(circle.x, circle.y, circle.radius * 2);
-    if (circle.expanding) {
-      circle.radius += 5; // Increase radius for animation effect
-      if (circle.radius > circle.maxRadius) {
-        circle.visible = false; // Hide circle when max radius is exceeded
-        circle.expanding = false; // Stop expanding
-      }
-    }
+}
+function keyPressed() {
+  if (key == " ") {
+    //this is a neat trick to invert a boolean variable,
+    //it will always make it the opposite of what it was
+    drawSegments = !drawSegments;
   }
 }
 
-// Mouse events for interaction
-function mousePressed() {
-  circle.x = mouseX;
-  circle.y = mouseY;
-  circle.radius = 20;
-  circle.visible = true;
-  circle.expanding = false;
-
-  segments.forEach(segment => {
-    if (segment.contains(mouseX, mouseY)) {
-      segment.displayOriginal = true;  // Display original image segment on click
-    } else {
-      segment.displayOriginal = false;
-    }
-  });
+function windowResized() {
+  resizeCanvas(windowWidth, windowHeight);
+  calculateImageDrawProps();
+  for (const segment of segments) {
+    segment.calculateSegDrawProps();
+  }
 }
 
-function mouseReleased() {
-  circle.expanding = true; // Start expanding circle on mouse release
-  segments.forEach(segment => {
-    segment.displayOriginal = false;  // Reset image segment display on mouse release
-  });
+function calculateImageDrawProps() {
+  //Calculate the aspect ratio of the canvas
+  canvasAspectRatio = width / height;
+  //if the image is wider than the canvas
+  if (imgDrwPrps.aspect > canvasAspectRatio) {
+    //then we will draw the image to the width of the canvas
+    imgDrwPrps.width = width;
+    //and calculate the height based on the aspect ratio
+    imgDrwPrps.height = width / imgDrwPrps.aspect;
+    imgDrwPrps.yOffset = (height - imgDrwPrps.height) / 2;
+    imgDrwPrps.xOffset = 0;
+  } else if (imgDrwPrps.aspect < canvasAspectRatio) {
+    //otherwise we will draw the image to the height of the canvas
+    imgDrwPrps.height = height;
+    //and calculate the width based on the aspect ratio
+    imgDrwPrps.width = height * imgDrwPrps.aspect;
+    imgDrwPrps.xOffset = (width - imgDrwPrps.width) / 2;
+    imgDrwPrps.yOffset = 0;
+  }
+  else if (imgDrwPrps.aspect == canvasAspectRatio) {
+    //if the aspect ratios are the same then we can draw the image to the canvas size
+    imgDrwPrps.width = width;
+    imgDrwPrps.height = height;
+    imgDrwPrps.xOffset = 0;
+    imgDrwPrps.yOffset = 0;
+  }
 }
-
-// ImageSegment class to manage each image segment
+//Here is our class for the image segments, we start with the class keyword
 class ImageSegment {
-  constructor(x, y, width, height, colour) {
-    this.x = x;
-    this.y = y;
-    this.width = width;
-    this.height = height;
-    this.colour = colour;
-    this.displayOriginal = false;
+
+  constructor(columnPositionInPrm, rowPostionInPrm  ,srcImgSegColourInPrm) {
+    //Now we have changed the class a lot, instead of the x and y position of the segment, we will store the row and column position
+    //The row and column position give us relative position of the segment in the image that do not change when the image is resized
+    //We will use these to calculate the x and y position of the segment when we draw it
+
+    this.columnPosition = columnPositionInPrm;
+    this.rowPostion = rowPostionInPrm;
+    this.srcImgSegColour = srcImgSegColourInPrm;
+    //These parameters are not set when we create the segment object, we will calculate them later
+    this.drawXPos = 0;
+    this.drawYPos = 0;
+    this.drawWidth = 0;
+    this.drawHeight = 0;
+  
+    
+  }
+
+  calculateSegDrawProps() {
+    //Here is where we will calculate the draw properties of the segment.
+    //The width and height are easy to calculate, remember the image made of segments is always the same size as the whole image even when it is resized
+    //We can use the width and height we calculated for the image to be drawn, to calculate the size of each segment
+    this.drawWidth = imgDrwPrps.width / numSegments;
+    this.drawHeight = imgDrwPrps.height / numSegments;
+    
+    //we can use the row and column position to calculate the x and y position of the segment
+    //Here is a diagram to help you visualise what is going on
+    
+    //          column0 column1 column2 column3 column4
+    //             ↓       ↓       ↓       ↓       ↓
+    //    row0 → 0,0     0,1     0,2     0,3     0,4
+    //    row1 → 1,0     1,1     1,2     1,3     1.4
+    //    row2 → 2,0     2,1     2,2     2,3     2,4
+    //    row3 → 3,0     3,1     3,2     3,3     3,4
+    //    row4 → 4,0     4,1     4,2     4,3     4,4
+
+    //The x position is the row position multiplied by the width of the segment plus the x offset we calculated for the image
+    this.drawXPos = this.rowPostion * this.drawWidth + imgDrwPrps.xOffset;
+    //The y position is the column position multiplied by the height of the segment plus the y offset we calculated for the image
+    this.drawYPos = this.columnPosition * this.drawHeight + imgDrwPrps.yOffset;
   }
 
   draw() {
-    // Check if the mouse is over the segment
-    if (this.contains(mouseX, mouseY)) {
-      stroke(255, 0, 0); // Red stroke for hover
-    } else {
-      stroke(0); // Black stroke otherwise
-    }
-
-    if (this.displayOriginal) {
-      // Draw original image segment
-      image(img, this.x, this.y, this.width, this.height, this.x, this.y, this.width, this.height);
-    } else {
-      // Draw modified segment with fill color, leave 1 pixel space for borders
-      fill(this.colour);
-      rect(this.x, this.y, this.width - 1, this.height - 1);
-    }
+    //let's draw the segment to the canvas, first we set the stroke and fill colours
+    stroke(0);
+    fill(this.srcImgSegColour);
+    //Then draw the segment as a rectangle, using the draw properties we calculated
+    rect(this.drawXPos, this.drawYPos, this.drawWidth, this.drawHeight);
   }
 
-  contains(px, py) {
-    return px >= this.x && px <= this.x + this.width && py >= this.y && py <= this.y + this.height;
-  }
+
 }
-
